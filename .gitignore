@@ -1,0 +1,7 @@
+# Ignore FASTQ, BAM, reference data, large outputs
+test-datasets/
+results_test/
+work/
+.nextflow*
+*.log
+*.tmp
