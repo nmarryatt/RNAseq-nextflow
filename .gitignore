@@ -1,7 +1,8 @@
 # Ignore FASTQ, BAM, reference data, large outputs
 test-datasets/
-results_test/
+results/
 work/
 .nextflow*
 *.log
 *.tmp
+.DS_Store
