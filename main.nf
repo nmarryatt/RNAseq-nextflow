@@ -1,10 +1,8 @@
 #!/usr/bin/env nextflow
 
-
 // Parameters
 params.reads = '/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/testdata/*_subsamp.fastq.gz'
 params.outdir = '/Users/nataliemarryatt/RNAseq-nextflow/results'
-
 
 
 // Process: print out fastq files
@@ -42,12 +40,29 @@ process fastqc {
 
 }
 
+// MultiQC: aggregate all FASTQC reports together
+process multiqc{
+    publishDir "${params.outdir}", mode: 'copy'
+    
+    input:
+    path('*')  // Takes all FastQC outputs
+    
+    output:
+    path "multiqc_report.html"
+    path "multiqc_data"
+    
+    script:
+    """
+    multiqc .
+    """
+}
+
+
 // Workflow
 
 workflow {
     reads_ch = Channel.fromPath(params.reads)
-    reads_ch.view()
-    reads_ch.view { "Found file: $it" } 
-    fastqc(reads_ch)
-    
+    //reads_ch.view { "Found file: $it" } 
+    fastqc_out = fastqc(reads_ch)
+    multiqc(fastqc_out.collect())
 }
