@@ -3,6 +3,7 @@
 // Parameters
 params.reads = '/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/testdata/*_subsamp.fastq.gz'
 params.outdir = '/Users/nataliemarryatt/RNAseq-nextflow/results'
+params.salmon_index = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/salmon"
 
 
 // Process: print out fastq files
@@ -40,12 +41,35 @@ process fastqc {
 
 }
 
+// Salmon quantification
+process salmon_quant {
+    tag "$reads.simpleName"
+    publishDir "${params.outdir}/salmon", mode: 'copy'
+    
+    input:
+    path reads
+    
+    output:
+    path "${reads.simpleName}_quant", emit: quant
+    path "${reads.simpleName}_quant/logs", emit: logs
+    
+    script:
+    """
+    salmon quant -i ${params.salmon_index} \
+        -l A \
+        -r ${reads} \
+        -o ${reads.simpleName}_quant \
+        --validateMappings
+    """
+}
+
+
 // MultiQC: aggregate all FASTQC reports together
 process multiqc{
     publishDir "${params.outdir}", mode: 'copy'
     
     input:
-    path('*')  // Takes all FastQC outputs
+    path('*', stageAs: 'input?/*') // Takes all FastQC outputs
     
     output:
     path "multiqc_report.html"
@@ -64,5 +88,13 @@ workflow {
     reads_ch = Channel.fromPath(params.reads)
     //reads_ch.view { "Found file: $it" } 
     fastqc_out = fastqc(reads_ch)
-    multiqc(fastqc_out.collect())
+    salmon_out = salmon_quant(reads_ch)
+
+    all_outputs = fastqc_out
+        .mix(salmon_out)
+        .flatten()
+        .collect()
+
+
+    multiqc(all_outputs)
 }
