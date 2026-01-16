@@ -22,15 +22,16 @@ nextflow run main.nf
 ```
 
 Parameters are defined in nextflow.config and can be overridden at runtime:
---reads	(path pattern to input FASTQ files). 
---outdir (output directory for pipeline results).  
---salmon_index (path to a pre-built Salmon transcriptome index).  
+- --reads	(path pattern to input FASTQ files). 
+- --outdir (output directory for pipeline results).  
+- --salmon_index (path to a pre-built Salmon transcriptome index).  
 
 This pipeline uses Conda to manage tool dependencies. No manual installation of tools required
 
 
 ## Output structure
 All outputs are copied to the directory specified by --outdir.
+```text
 results/
 ├── fastqc/
 │   ├── sample_fastqc.html
@@ -42,7 +43,7 @@ results/
 ├── sample_subsamp_info.txt
 ├── multiqc_report.html
 └── multiqc_data/
-
+```
 
 ## Notes 
 The pipeline currently assumes single-end RNA-seq data.  
