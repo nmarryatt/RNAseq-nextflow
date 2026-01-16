@@ -12,19 +12,19 @@ This pipeline performs basic RNA-seq processing on FASTQ files, including qualit
 4. **QC aggregation:** aggregates FastQC outputs into a single MultiQC report
 
 ## Requirements
-Nextflow ≥ 25
-Java 17
-Conda (Miniconda or Anaconda recommended)
+Nextflow ≥ 25, Java 17, Conda (Miniconda or Anaconda recommended).
 All bioinformatics tools are installed automatically using Conda environments defined in nextflow.config.
 
 ## Usage
 Run the pipeline from the project directory:
+```bash
 nextflow run main.nf
+```
 
 Parameters are defined in nextflow.config and can be overridden at runtime:
---reads	(path pattern to input FASTQ files)
---outdir (output directory for pipeline results)
---salmon_index (path to a pre-built Salmon transcriptome index)
+--reads	(path pattern to input FASTQ files). 
+--outdir (output directory for pipeline results).  
+--salmon_index (path to a pre-built Salmon transcriptome index).  
 
 This pipeline uses Conda to manage tool dependencies. No manual installation of tools required
 
@@ -43,8 +43,9 @@ results/
 ├── multiqc_report.html
 └── multiqc_data/
 
+
 ## Notes 
-The pipeline currently assumes single-end RNA-seq data
-A Salmon index must already exist
-Absolute paths are used for development and may be made relative in future versions
-This workflow uses Nextflow DSL2
+The pipeline currently assumes single-end RNA-seq data.  
+A Salmon index must already exist.  
+Absolute paths are used for development and may be made relative in future versions.  
+This workflow uses Nextflow DSL2.  
