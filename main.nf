@@ -4,6 +4,10 @@
 params.reads = '/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/testdata/*_subsamp.fastq.gz'
 params.outdir = '/Users/nataliemarryatt/RNAseq-nextflow/results'
 params.salmon_index = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/salmon"
+params.star_index = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/star"  
+params.genome_fasta = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/genome.fa"  // For building index
+params.gff = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/genes.gff"  // For building index
+
 
 
 // Process: print out fastq files
@@ -32,7 +36,7 @@ process fastqc {
         path reads
 
     output:
-        path "*_fastqc.{html,zip}"
+        path "*_fastqc.{html,zip}", emit: reports
     
     script:
     """
@@ -69,7 +73,10 @@ process multiqc{
     publishDir "${params.outdir}", mode: 'copy'
     
     input:
-    path('*', stageAs: 'input?/*') // Takes all FastQC outputs
+    path('data_fastqc/*')
+    path('data_salmon/*')
+    path('data_star/*')
+    
     
     output:
     path "multiqc_report.html"
@@ -82,19 +89,79 @@ process multiqc{
 }
 
 
-// Workflow
+process star_index {
+    publishDir "${params.outdir}/star_index", mode: 'copy'
+    cpus 4
+    memory '8 GB'
+    
+    input:
+    path genome_fasta
+    path gff
+    
+    output:
+    path "star_index"
+    
+    script:
+    """
+    mkdir star_index
+    STAR --runMode genomeGenerate \
+         --genomeDir star_index \
+         --genomeFastaFiles ${genome_fasta} \
+         --sjdbGTFfile ${gff} \
+         --sjdbGTFtagExonParentTranscript Parent \
+         --genomeSAindexNbases 7 \
+         --runThreadN ${task.cpus}
+    """
+}
 
+
+process star_align {
+    tag "$reads.simpleName"
+    publishDir "${params.outdir}/star", mode: 'copy'
+    cpus 4
+    memory '8 GB'
+    
+    input:
+    path star_index
+    path reads
+    
+    output:
+    path "*Aligned.sortedByCoord.out.bam", emit: bam
+    path "*Log.final.out", emit: logs
+    path "*ReadsPerGene.out.tab", emit: counts
+    
+    script:
+    """
+    STAR --runThreadN ${task.cpus} \
+         --genomeDir ${star_index} \
+         --readFilesIn ${reads} \
+         --readFilesCommand zcat \
+         --outSAMtype BAM SortedByCoordinate \
+         --quantMode GeneCounts \
+         --outFileNamePrefix ${reads.simpleName}_ \
+         --limitBAMsortRAM 4000000000
+    """
+}
+
+// Workflow
 workflow {
-    reads_ch = Channel.fromPath(params.reads)
-    //reads_ch.view { "Found file: $it" } 
+    reads_ch = Channel.fromPath(params.reads, checkIfExists: true)
+    
+    // Run FastQC
     fastqc_out = fastqc(reads_ch)
+    
+    // Run Salmon
     salmon_out = salmon_quant(reads_ch)
 
-    all_outputs = fastqc_out
-        .mix(salmon_out)
-        .flatten()
-        .collect()
-
-
-    multiqc(all_outputs)
+    star_index = star_index(params.genome_fasta, params.gff)
+    
+    // Run STAR 
+    star_out = star_align( star_index, reads_ch)
+    
+    // Aggregate all for MultiQC
+    multiqc(
+        fastqc_out.reports.collect(),
+        salmon_out.quant.collect(),
+        star_out.logs.collect()
+    )
 }
