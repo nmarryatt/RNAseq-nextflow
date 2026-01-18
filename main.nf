@@ -4,10 +4,9 @@
 params.reads = '/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/testdata/*_subsamp.fastq.gz'
 params.outdir = '/Users/nataliemarryatt/RNAseq-nextflow/results'
 params.salmon_index = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/salmon"
-params.star_index = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/star"  
-params.genome_fasta = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/genome.fa"  // For building index
-params.gff = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/genes.gff"  // For building index
-
+params.transcriptome_fasta= '/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/transcriptome.fasta'
+params.genome_fasta = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/genome.fa"  
+params.gff = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/genes.gff"  
 
 
 // Process: print out fastq files
@@ -45,6 +44,30 @@ process fastqc {
 
 }
 
+// Create salmon index
+process salmon_index {
+
+    publishDir "${params.outdir}/salmon_index", mode: 'copy'
+    cpus 4
+    memory '8 GB'
+    
+    input:
+    path transcriptome_fasta
+    
+    output:
+    path "salmon_index"
+    
+    script:
+    """
+    salmon index \
+        -t ${transcriptome_fasta} \
+        -i salmon_index \
+        -k 31 \
+        -p ${task.cpus}
+    """
+}
+
+
 // Salmon quantification
 process salmon_quant {
     tag "$reads.simpleName"
@@ -52,6 +75,7 @@ process salmon_quant {
     
     input:
     path reads
+    path salmon_index
     
     output:
     path "${reads.simpleName}_quant", emit: quant
@@ -59,7 +83,7 @@ process salmon_quant {
     
     script:
     """
-    salmon quant -i ${params.salmon_index} \
+    salmon quant -i ${salmon_index} \
         -l A \
         -r ${reads} \
         -o ${reads.simpleName}_quant \
@@ -150,13 +174,23 @@ workflow {
     // Run FastQC
     fastqc_out = fastqc(reads_ch)
     
-    // Run Salmon
-    salmon_out = salmon_quant(reads_ch)
+ 
+    // Salmon index - build or use existing
+    if (params.build_salmon_index) {
+        salmon_index = salmon_index(params.transcriptome_fasta)
+    } else {
+        salmon_index = Channel.fromPath(params.salmon_index, type: 'dir')
+    }
 
-    star_index = star_index(params.genome_fasta, params.gff)
+    // Run Salmon
+    salmon_out = salmon_quant(reads_ch, salmon_index)
     
-    // Run STAR 
+    // Create STAR index
+    star_index = star_index(params.genome_fasta, params.gff)
+
+    // Run STAR
     star_out = star_align( star_index, reads_ch)
+
     
     // Aggregate all for MultiQC
     multiqc(
@@ -165,3 +199,6 @@ workflow {
         star_out.logs.collect()
     )
 }
+
+
+params.build_salmon_index = true  
