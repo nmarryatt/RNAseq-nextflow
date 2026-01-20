@@ -1,14 +1,5 @@
 #!/usr/bin/env nextflow
 
-// Parameters
-params.reads = '/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/testdata/*_subsamp.fastq.gz'
-params.outdir = '/Users/nataliemarryatt/RNAseq-nextflow/results'
-params.salmon_index = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/salmon"
-params.transcriptome_fasta= '/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/transcriptome.fasta'
-params.genome_fasta = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/genome.fa"  
-params.gff = "/Users/nataliemarryatt/RNAseq-nextflow/test-datasets/reference/genes.gff"  
-
-
 // Process: print out fastq files
 process check_files {
 
@@ -62,7 +53,7 @@ process salmon_index {
     salmon index \
         -t ${transcriptome_fasta} \
         -i salmon_index \
-        -k 31 \
+        -k ${params.salmon_kmer} \
         -p ${task.cpus}
     """
 }
@@ -92,27 +83,7 @@ process salmon_quant {
 }
 
 
-// MultiQC: aggregate all FASTQC reports together
-process multiqc{
-    publishDir "${params.outdir}", mode: 'copy'
-    
-    input:
-    path('data_fastqc/*')
-    path('data_salmon/*')
-    path('data_star/*')
-    
-    
-    output:
-    path "multiqc_report.html"
-    path "multiqc_data"
-    
-    script:
-    """
-    multiqc .
-    """
-}
-
-
+// Create STAR index
 process star_index {
     publishDir "${params.outdir}/star_index", mode: 'copy'
     cpus 4
@@ -133,12 +104,12 @@ process star_index {
          --genomeFastaFiles ${genome_fasta} \
          --sjdbGTFfile ${gff} \
          --sjdbGTFtagExonParentTranscript Parent \
-         --genomeSAindexNbases 7 \
+         --genomeSAindexNbases ${params.star_genomeSAindexNbases} \
          --runThreadN ${task.cpus}
     """
 }
 
-
+// STAR alignment
 process star_align {
     tag "$reads.simpleName"
     publishDir "${params.outdir}/star", mode: 'copy'
@@ -164,6 +135,27 @@ process star_align {
          --quantMode GeneCounts \
          --outFileNamePrefix ${reads.simpleName}_ \
          --limitBAMsortRAM 4000000000
+    """
+}
+
+
+// MultiQC: aggregate all FASTQC reports together
+process multiqc{
+    publishDir "${params.outdir}", mode: 'copy'
+    
+    input:
+    path('data_fastqc/*')
+    path('data_salmon/*')
+    path('data_star/*')
+    
+    
+    output:
+    path "multiqc_report.html"
+    path "multiqc_data"
+    
+    script:
+    """
+    multiqc .
     """
 }
 
